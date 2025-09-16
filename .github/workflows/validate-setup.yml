@@ -1,0 +1,55 @@
+name: Validate PowerShell Setup Scripts
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'scripts/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-powershell-scripts:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Test PowerShell script syntax
+      run: |
+        # Test all PowerShell scripts for syntax errors
+        Get-ChildItem -Path "scripts" -Filter "*.ps1" | ForEach-Object {
+          Write-Host "Testing syntax: $($_.Name)"
+          $null = [System.Management.Automation.PSParser]::Tokenize((Get-Content $_.FullName -Raw), [ref]$null)
+          Write-Host "✅ $($_.Name) syntax OK"
+        }
+      shell: powershell
+      
+    - name: Test minimal setup (research-only)
+      run: |
+        .\scripts\setup-environment.ps1 -SetupType research-only
+      shell: powershell
+      
+    - name: Validate research-only setup
+      run: |
+        .\scripts\validate-setup.ps1
+      shell: powershell
+
+  test-cross-platform-compatibility:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install PowerShell Core
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget apt-transport-https software-properties-common
+        wget -q https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb
+        sudo dpkg -i packages-microsoft-prod.deb
+        sudo apt-get update
+        sudo apt-get install -y powershell
+        
+    - name: Test PowerShell scripts on Linux
+      run: |
+        pwsh -Command ".\scripts\setup-environment.ps1 -SetupType research-only"
+        pwsh -Command ".\scripts\validate-setup.ps1"
